@@ -1,31 +1,30 @@
 import pandas as pd
 import numpy as np
 
-from sklearn.preprocessing import MultiLabelBinarizer, MinMaxScaler, StandardScaler
+from sklearn.preprocessing import MultiLabelBinarizer, MinMaxScaler
 from sklearn.feature_extraction.text import TfidfVectorizer
-import ast
 
 df = pd.read_csv("tmdb_movies_filtered_500.csv")
 print(df.info())
 print(df.head())
 
 def process_genres(genre):
-  if isinstance(genre, str):
-    return genre.split(', ')
-  return []
+    if not isinstance(genre, str):
+        return []
+    return [g.strip() for g in genre.split(',') if g.strip()]
 
 def process_keywords(keywords):
-  if isinstance(keywords, str):
-      return keywords.split(', ')
-  return []
+    if not isinstance(keywords, str):
+        return []
+    return [k.strip() for k in keywords.split(',') if k.strip()]
 
 def keywords_to_text(keyword_list):
-  if isinstance(keyword_list, list):
-      # Remove spaces within multi-word phrases by replacing with underscores
-      # "virtual reality" → "virtual_reality"
-      cleaned = [k.strip().lower().replace(' ', '_') for k in keyword_list]
-      return ' '.join(cleaned)
-  return ''
+    if isinstance(keyword_list, list):
+        # Remove spaces within multi-word phrases by replacing with underscores
+        # "virtual reality" → "virtual_reality"
+        cleaned = [k.strip().lower().replace(' ', '_') for k in keyword_list]
+        return ' '.join(cleaned)
+    return ''
 
 df['genres_list'] = df['genres'].apply(process_genres)
                                       
@@ -43,8 +42,16 @@ tfidf = TfidfVectorizer(max_features=500)
 keywords_tfidf = tfidf.fit_transform(df['keywords_text'])
 keywords_df = pd.DataFrame(keywords_tfidf.toarray(), columns=tfidf.get_feature_names_out())
 
-# Normalizing numerical features using min-max normalization
+# Numerical feature engineering
 numerical_columns = ['vote_average', 'vote_count', 'revenue', 'runtime', 'budget', 'popularity']
+for col in numerical_columns:
+        df[col] = pd.to_numeric(df[col], errors='coerce').fillna(0)
+
+# Log-scale highly skewed quantities before normalization
+skewed_columns = ['vote_count', 'revenue', 'budget', 'popularity']
+for col in skewed_columns:
+        df[col] = np.log1p(df[col].clip(lower=0))
+
 scaler = MinMaxScaler()
 df_num_scaled = pd.DataFrame(scaler.fit_transform(df[numerical_columns]), columns=numerical_columns)
 
@@ -56,15 +63,16 @@ df_num_scaled.reset_index(drop=True, inplace=True)
 # Combine
 movie_features = pd.concat([genres_df, keywords_df, df_num_scaled], axis=1)
 
-# Initial weighting experimentation
+# Feature weighting (used in final exported vectors)
 genre_weight = 1.5
 keyword_weight = 2.0
-rating_weight = 0.5
+numeric_weight = 0.5
 
 weighted_features = pd.concat([
     genres_df * genre_weight,
     keywords_df * keyword_weight,
-    df_num_scaled * rating_weight
+        df_num_scaled * numeric_weight
 ], axis=1)
 
-movie_features.to_csv("movie_feature_vectors.csv", index=False)
+weighted_features.to_csv("movie_feature_vectors.csv", index=False)
+print(f"Saved weighted feature vectors with shape: {weighted_features.shape}")

@@ -10,6 +10,12 @@ class CosineSimilarityModel:
 
     def recommend(self, liked_indices, n_recommendations=5):
         """Generate recommendations using cosine similarity to user profile vector."""
+        liked_indices = np.array(liked_indices, dtype=int)
+        if liked_indices.size == 0:
+            return np.array([], dtype=int), np.array([], dtype=float)
+
+        n_recommendations = max(1, int(n_recommendations))
+
         liked_features = self.features[liked_indices]
         user_vector = np.mean(liked_features, axis=0).reshape(1, -1)
 
