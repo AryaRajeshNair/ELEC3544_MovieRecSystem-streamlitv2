@@ -77,7 +77,7 @@ def format_recommendations(df, rec_indices, scores):
     else:
         recs['Language'] = recs[language_col].fillna('N/A')
 
-    recs['similarity_score'] = np.round(scores * 100, 1)
+    recs['similarity_score'] = [float(f"{s:.1f}") for s in scores * 100]
 
     if 'poster_path' in recs.columns:
         recs['Poster URL'] = recs['poster_path'].apply(

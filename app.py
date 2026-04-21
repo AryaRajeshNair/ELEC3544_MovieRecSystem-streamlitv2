@@ -1,9 +1,11 @@
 import streamlit as st
 import pandas as pd
+import numpy as np
 import plotly.express as px
 
-from models.cosine_model import CosineSimilarityModel
-from models.knn_model import KNNModel
+from models.content_based_model import ContentBasedModel
+from models.embedding_model import EmbeddingBasedModel
+from models.popularity_hybrid_model import PopularityHybridModel
 from services.explanations import build_recommendation_explanations
 from services.recommendation_utils import (
     analyze_user_taste,
@@ -115,8 +117,77 @@ if len(st.session_state.liked_movies) >= 3:
     
     model_choice = st.radio(
         "Select a model:",
-        ["Cosine Similarity", "K-Nearest Neighbors (KNN)"]
+        ["Content-Based", "Semantic Embedding", "Popularity Hybrid"],
+        help="Choose how movies should be recommended to you"
     )
+    
+    # Show model explanation with technical details
+    model_explanations = {
+        "Content-Based": {
+            "icon": "📋",
+            "title": "Content-Based Filtering",
+            "desc": "Analyzes genres, keywords, and numerical features of your favorite movies to find similar ones.",
+            "technical": """
+**Algorithm**: Feature Averaging + Cosine Similarity
+
+**How it works**:
+1. Extracts 556 features per movie: 50 genre indicators (one-hot), 500 TF-IDF keyword scores, 6 numerical metrics (rating, popularity, budget, etc.)
+2. Creates user profile: `user_vector = average(liked_movies_features)`
+3. Computes cosine similarity: `similarity = (user·movie) / (||user|| × ||movie||)` for all movies
+4. Returns top recommendations by similarity score
+
+**Pros**: Fast (< 100ms), transparent, no data requirements
+**Cons**: Misses semantic meaning, can be too specific to liked movie features
+            """
+        },
+        "Semantic Embedding": {
+            "icon": "🧠",
+            "title": "Semantic Embedding (AI-Powered)",
+            "desc": "Uses neural networks to understand movie plots and themes. Finds movies with similar stories even if they don't share keywords.",
+            "technical": """
+**Algorithm**: Sentence-Transformers (BERT-based) + Cosine Similarity
+
+**How it works**:
+1. Uses pre-trained `all-MiniLM-L6-v2` model (138M parameters) to encode movie overviews
+2. Each plot → 384-dimensional semantic embedding (captures meaning, themes, narrative patterns)
+3. Creates user profile: `user_embedding = average(liked_movies_embeddings)`
+4. Computes cosine similarity in embedding space for all movies
+5. Returns top recommendations by semantic similarity
+
+**Architecture**: Transformer-based (BERT-variant), trained on 215M+ sentence pairs for semantic understanding
+
+**Pros**: Finds thematically similar movies, discovers hidden connections, generalizes well
+**Cons**: Slower (~1-2s initial encoding), depends on plot description quality, requires pre-trained model
+            """
+        },
+        "Popularity Hybrid": {
+            "icon": "⭐",
+            "title": "Popularity Hybrid",
+            "desc": "Balances personal taste with movie popularity. Recommends well-rated movies that match your preferences.",
+            "technical": """
+**Algorithm**: Weighted Blend of Content Similarity + Popularity Metrics
+
+**How it works**:
+1. Computes content similarity (same as Content-Based): user_vector averaged from liked movies
+2. Normalizes content scores to [0, 1] range
+3. Calculates popularity score: `popularity_norm = (popularity - min) / (max - min)`
+4. Calculates quality score: `0.6 × (rating/10) + 0.4 × vote_count_norm`
+5. Blends: `hybrid_score = 0.7 × content_similarity + 0.3 × popularity`
+6. Returns top recommendations by hybrid score
+
+**Weighting**: 70% personalization, 30% popularity (tunable)
+
+**Pros**: Balances niche with mainstream, reduces risk of recommending obscure low-quality films
+**Cons**: May favor popular movies even if less similar to your taste
+            """
+        }
+    }
+    
+    exp = model_explanations[model_choice]
+    st.info(f"**{exp['icon']} {exp['title']}**: {exp['desc']}")
+    
+    with st.expander("📊 Technical Details"):
+        st.markdown(exp['technical'])
 
     n_recommendations = 5
     
@@ -129,18 +200,23 @@ if len(st.session_state.liked_movies) >= 3:
             # Analyze user taste
             taste_profile = analyze_user_taste(df, liked_indices)
             
-            # Generate recommendations for both models (for comparison visualization)
-            cosine_model = CosineSimilarityModel(movie_features)
-            cosine_rec_indices, cosine_scores = cosine_model.recommend(liked_indices, n_recommendations)
+            # Generate recommendations for all models (for comparison visualization)
+            content_model = ContentBasedModel(movie_features)
+            content_rec_indices, content_scores = content_model.recommend(liked_indices, n_recommendations)
 
-            knn_model = KNNModel(movie_features)
-            knn_rec_indices, knn_scores = knn_model.recommend(liked_indices, n_recommendations)
+            embedding_model = EmbeddingBasedModel(df)
+            embedding_rec_indices, embedding_scores = embedding_model.recommend(liked_indices, n_recommendations)
+
+            hybrid_model = PopularityHybridModel(movie_features, df)
+            hybrid_rec_indices, hybrid_scores = hybrid_model.recommend(liked_indices, n_recommendations)
 
             # Active model for main recommendations tab
-            if model_choice == "Cosine Similarity":
-                rec_indices, scores = cosine_rec_indices, cosine_scores
-            else:
-                rec_indices, scores = knn_rec_indices, knn_scores
+            model_map = {
+                "Content-Based": (content_rec_indices, content_scores),
+                "Semantic Embedding": (embedding_rec_indices, embedding_scores),
+                "Popularity Hybrid": (hybrid_rec_indices, hybrid_scores)
+            }
+            rec_indices, scores = model_map[model_choice]
 
             explanations = build_recommendation_explanations(
                 df=df,
@@ -156,10 +232,12 @@ if len(st.session_state.liked_movies) >= 3:
                 'liked_indices': liked_indices,
                 'rec_indices': rec_indices,
                 'scores': scores,
-                'cosine_rec_indices': cosine_rec_indices,
-                'cosine_scores': cosine_scores,
-                'knn_rec_indices': knn_rec_indices,
-                'knn_scores': knn_scores,
+                'content_rec_indices': content_rec_indices,
+                'content_scores': content_scores,
+                'embedding_rec_indices': embedding_rec_indices,
+                'embedding_scores': embedding_scores,
+                'hybrid_rec_indices': hybrid_rec_indices,
+                'hybrid_scores': hybrid_scores,
                 'taste_profile': taste_profile,
                 'recs_df': format_recommendations(df, rec_indices, scores),
                 'explanations': explanations
@@ -169,7 +247,7 @@ if len(st.session_state.liked_movies) >= 3:
         results = st.session_state.results
         st.markdown("---")
 
-        tab1, tab2, tab3 = st.tabs(["Recommendations", "Model Visualization", "Why These Movies"])
+        tab1, tab2 = st.tabs(["Recommendations", "Why These Movies"])
 
         with tab1:
             col1, col2, col3 = st.columns(3)
@@ -212,8 +290,9 @@ if len(st.session_state.liked_movies) >= 3:
                     st.caption("Release year data is limited for this selection.")
 
             st.subheader(f"🎯 Recommended Movies ({results['model_choice']})")
+            rec_indices_array = np.asarray(results['rec_indices']).flatten()
             for pos, (_, row) in enumerate(results['recs_df'].iterrows()):
-                rec_idx = int(results['rec_indices'][pos])
+                rec_idx = int(rec_indices_array[pos])
                 exp = results['explanations'][rec_idx]
 
                 with st.container(border=True):
@@ -242,62 +321,10 @@ if len(st.session_state.liked_movies) >= 3:
                         st.info(exp['summary'])
 
         with tab2:
-            st.subheader("🧭 Model-Specific Visualizations")
-            st.caption("Projection uses PCA. Distances shown here are approximate visual aids; recommendations are computed in full feature space.")
-
-            left_col, right_col = st.columns(2)
-
-            with left_col:
-                fig_cosine = build_visualization_figure(
-                    df=df,
-                    movie_features_df=movie_features,
-                    coords=coords,
-                    liked_indices=results['liked_indices'],
-                    rec_indices=results['cosine_rec_indices'],
-                    model_type="Cosine Similarity",
-                    rec_scores=results['cosine_scores']
-                )
-                st.plotly_chart(fig_cosine, use_container_width=True)
-                st.caption("Cosine view: Orange rays connect the user taste centroid to cosine-selected recommendations.")
-
-            with right_col:
-                fig_knn = build_visualization_figure(
-                    df=df,
-                    movie_features_df=movie_features,
-                    coords=coords,
-                    liked_indices=results['liked_indices'],
-                    rec_indices=results['knn_rec_indices'],
-                    model_type="K-Nearest Neighbors (KNN)"
-                )
-                st.plotly_chart(fig_knn, use_container_width=True)
-                st.caption("KNN view: Blue links connect each recommendation to its nearest liked movie.")
-
-            st.markdown("### 🔄 Overlap and Differences")
-            cosine_set = set(map(int, results['cosine_rec_indices']))
-            knn_set = set(map(int, results['knn_rec_indices']))
-            both_set = cosine_set.intersection(knn_set)
-
-            m1, m2, m3 = st.columns(3)
-            with m1:
-                st.metric("Overlap Count", len(both_set))
-            with m2:
-                st.metric("Cosine-Only", len(cosine_set - knn_set))
-            with m3:
-                st.metric("KNN-Only", len(knn_set - cosine_set))
-
-            overlap_fig = build_overlap_figure(
-                df=df,
-                coords=coords,
-                liked_indices=results['liked_indices'],
-                cosine_rec_indices=results['cosine_rec_indices'],
-                knn_rec_indices=results['knn_rec_indices']
-            )
-            st.plotly_chart(overlap_fig, use_container_width=True)
-
-        with tab3:
             st.subheader("🔍 Why each movie was recommended")
+            rec_indices_array = np.asarray(results['rec_indices']).flatten()
             for pos, (_, row) in enumerate(results['recs_df'].iterrows()):
-                rec_idx = int(results['rec_indices'][pos])
+                rec_idx = int(rec_indices_array[pos])
                 exp = results['explanations'][rec_idx]
 
                 with st.container(border=True):

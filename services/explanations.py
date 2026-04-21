@@ -12,6 +12,9 @@ def build_recommendation_explanations(df, movie_features_df, rec_indices, liked_
     """Create human-readable explanation per recommended movie."""
     explanations = {}
     features = movie_features_df.values
+    
+    # Ensure scores is a numpy array
+    scores = np.asarray(scores).flatten()
 
     liked_genres_union = set()
     liked_keywords_union = set()
@@ -36,24 +39,33 @@ def build_recommendation_explanations(df, movie_features_df, rec_indices, liked_
         shared_genres = sorted(list(rec_genres.intersection(liked_genres_union)))[:3]
         shared_keywords = sorted(list(rec_keywords.intersection(liked_keywords_union)))[:5]
 
-        if model_name == "Cosine Similarity":
+        # Update summary based on model name
+        if model_name == "Content-Based":
             summary = (
-                f"High cosine similarity to your combined taste profile. "
+                f"High feature similarity to your taste profile. "
                 f"Closest to your liked movie '{nearest_liked_title}'."
             )
-        else:
+        elif model_name == "Semantic Embedding":
             summary = (
-                f"Appears in the nearest-neighbor region of your liked movies. "
-                f"Most similar to '{nearest_liked_title}'."
+                f"Thematically similar to your favorite movies. "
+                f"Shares narrative elements with '{nearest_liked_title}'."
+            )
+        else:  # Popularity Hybrid
+            summary = (
+                f"Well-rated movie matching your preferences. "
+                f"Similar to '{nearest_liked_title}'."
             )
 
+        # Safely access score with bounds checking
+        score_value = float(scores[i]) if i < len(scores) else 0.0
+        
         explanations[int(rec_idx)] = {
             'summary': summary,
             'nearest_title': nearest_liked_title,
             'nearest_similarity': round(nearest_similarity * 100, 1),
             'shared_genres': shared_genres,
             'shared_keywords': shared_keywords,
-            'model_score': round(float(scores[i]) * 100, 1)
+            'model_score': float(f"{score_value * 100:.1f}")
         }
 
     return explanations
