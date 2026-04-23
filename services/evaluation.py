@@ -47,6 +47,14 @@ def compute_model_overlap(content_indices, embedding_indices, hybrid_indices):
 
 def build_model_comparison_table(df, content_indices, content_scores, embedding_indices, embedding_scores, hybrid_indices, hybrid_scores):
     """Build a comprehensive comparison table of all model recommendations."""
+    # Convert to numpy arrays for consistent indexing
+    content_indices = np.asarray(content_indices).flatten()
+    embedding_indices = np.asarray(embedding_indices).flatten()
+    hybrid_indices = np.asarray(hybrid_indices).flatten()
+    content_scores = np.asarray(content_scores).flatten()
+    embedding_scores = np.asarray(embedding_scores).flatten()
+    hybrid_scores = np.asarray(hybrid_scores).flatten()
+    
     comparison_data = []
     
     for i in range(len(content_indices)):

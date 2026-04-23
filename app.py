@@ -16,7 +16,6 @@ from services.visualization import get_pca_projection
 from services.evaluation import (
     compute_model_overlap,
     build_model_comparison_table,
-    build_overlap_bar_chart,
     get_model_strengths
 )
 
@@ -361,13 +360,6 @@ if len(st.session_state.liked_movies) >= 3:
                 st.metric("Content Unique", len(overlap_stats['content_unique']))
             with col4:
                 st.metric("Embedding Unique", len(overlap_stats['embedding_unique']))
-            
-            st.markdown("---")
-            
-            # Overlap visualization
-            st.subheader("📊 Model Agreement Analysis")
-            fig_overlap = build_overlap_bar_chart(overlap_stats)
-            st.plotly_chart(fig_overlap, use_container_width=True)
             
             st.markdown("---")
             
