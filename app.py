@@ -344,59 +344,6 @@ if len(st.session_state.liked_movies) >= 3:
             venn_fig = build_model_overlap_venn(overlap_stats)
             st.plotly_chart(venn_fig, use_container_width=True)
 
-            total_recs = len(set(map(int, results['content_rec_indices'])))
-            all_three_count = len(overlap_stats['all_three'])
-            content_embedding_count = len(overlap_stats['content_embedding'])
-            content_hybrid_count = len(overlap_stats['content_hybrid'])
-            embedding_hybrid_count = len(overlap_stats['embedding_hybrid'])
-            
-            st.caption(f"Each model returns {total_recs} recommendations. Overlap counts are out of {total_recs}.")
-
-            # Clear overlap metrics
-            col1, col2, col3, col4 = st.columns(4)
-            with col1:
-                st.metric("Common to all 3", all_three_count)
-            with col2:
-                st.metric("Content + Embedding", content_embedding_count)
-            with col3:
-                st.metric("Content + Hybrid", content_hybrid_count)
-            with col4:
-                st.metric("Embedding + Hybrid", embedding_hybrid_count)
-
-            unique_col1, unique_col2, unique_col3 = st.columns(3)
-            with unique_col1:
-                st.metric("Only Content", len(overlap_stats['content_unique']))
-            with unique_col2:
-                st.metric("Only Embedding", len(overlap_stats['embedding_unique']))
-            with unique_col3:
-                st.metric("Only Hybrid", len(overlap_stats['hybrid_unique']))
-
-            st.markdown("---")
-
-            # Movie lists to make overlap interpretable
-            st.subheader("🎬 Overlap Movie Lists")
-
-            if all_three_count > 0:
-                all_three_titles = [df.iloc[int(idx)]['title'] for idx in sorted(overlap_stats['all_three'])]
-                st.write("**Recommended by all 3 models:**")
-                st.write(", ".join(all_three_titles))
-            else:
-                st.info("No movie was recommended by all three models for this input.")
-
-            with st.expander("Show pairwise overlaps"):
-                ce_titles = [df.iloc[int(idx)]['title'] for idx in sorted(overlap_stats['content_embedding'])]
-                ch_titles = [df.iloc[int(idx)]['title'] for idx in sorted(overlap_stats['content_hybrid'])]
-                eh_titles = [df.iloc[int(idx)]['title'] for idx in sorted(overlap_stats['embedding_hybrid'])]
-
-                st.write("**Content + Embedding:**")
-                st.write(", ".join(ce_titles) if ce_titles else "None")
-
-                st.write("**Content + Hybrid:**")
-                st.write(", ".join(ch_titles) if ch_titles else "None")
-
-                st.write("**Embedding + Hybrid:**")
-                st.write(", ".join(eh_titles) if eh_titles else "None")
-            
             st.markdown("---")
             
             # Detailed comparison table
