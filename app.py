@@ -12,7 +12,7 @@ from services.recommendation_utils import (
     format_recommendations,
     get_movie_suggestions,
 )
-from services.visualization import get_pca_projection
+from services.visualization import build_model_overlap_venn
 from services.evaluation import (
     compute_model_overlap,
     build_model_comparison_table,
@@ -39,14 +39,6 @@ if 'liked_movies' not in st.session_state:
 
 if 'results' not in st.session_state:
     st.session_state.results = None
-
-@st.cache_data
-def get_cached_projection(features_df):
-    """Cache PCA projection for visualization."""
-    return get_pca_projection(features_df)
-
-
-coords = get_cached_projection(movie_features)
 
 # ============================================================================
 # STREAMLIT UI
@@ -348,6 +340,9 @@ if len(st.session_state.liked_movies) >= 3:
                 results['embedding_rec_indices'],
                 results['hybrid_rec_indices']
             )
+
+            venn_fig = build_model_overlap_venn(overlap_stats)
+            st.plotly_chart(venn_fig, use_container_width=True)
 
             total_recs = len(set(map(int, results['content_rec_indices'])))
             all_three_count = len(overlap_stats['all_three'])
