@@ -12,10 +12,12 @@ from services.recommendation_utils import (
     format_recommendations,
     get_movie_suggestions,
 )
-from services.visualization import (
-    build_overlap_figure,
-    build_visualization_figure,
-    get_pca_projection,
+from services.visualization import get_pca_projection
+from services.evaluation import (
+    compute_model_overlap,
+    build_model_comparison_table,
+    build_overlap_bar_chart,
+    get_model_strengths
 )
 
 # Set page config
@@ -247,7 +249,7 @@ if len(st.session_state.liked_movies) >= 3:
         results = st.session_state.results
         st.markdown("---")
 
-        tab1, tab2 = st.tabs(["Recommendations", "Why These Movies"])
+        tab1, tab2, tab3 = st.tabs(["Recommendations", "Why These Movies", "Model Evaluation"])
 
         with tab1:
             col1, col2, col3 = st.columns(3)
@@ -338,6 +340,87 @@ if len(st.session_state.liked_movies) >= 3:
                     st.write(f"**Shared genres:** {shared_genres_text}")
                     st.write(f"**Shared keywords:** {shared_keywords_text}")
                     st.write(f"**Why chosen:** {exp['summary']}")
+            
+        with tab3:
+            st.subheader("⚖️ Model Comparison & Analysis")
+            
+            # Compute overlap statistics
+            overlap_stats = compute_model_overlap(
+                results['content_rec_indices'],
+                results['embedding_rec_indices'],
+                results['hybrid_rec_indices']
+            )
+            
+            # Model Agreement Metrics
+            col1, col2, col3, col4 = st.columns(4)
+            with col1:
+                st.metric("All 3 Agree", len(overlap_stats['all_three']))
+            with col2:
+                st.metric("Agreement %", f"{overlap_stats['agreement_percent']:.0f}%")
+            with col3:
+                st.metric("Content Unique", len(overlap_stats['content_unique']))
+            with col4:
+                st.metric("Embedding Unique", len(overlap_stats['embedding_unique']))
+            
+            st.markdown("---")
+            
+            # Overlap visualization
+            st.subheader("📊 Model Agreement Analysis")
+            fig_overlap = build_overlap_bar_chart(overlap_stats)
+            st.plotly_chart(fig_overlap, use_container_width=True)
+            
+            st.markdown("---")
+            
+            # Detailed comparison table
+            st.subheader("📋 Detailed Recommendations Comparison")
+            comparison_df = build_model_comparison_table(
+                df,
+                results['content_rec_indices'],
+                results['content_scores'],
+                results['embedding_rec_indices'],
+                results['embedding_scores'],
+                results['hybrid_rec_indices'],
+                results['hybrid_scores']
+            )
+            st.dataframe(comparison_df, use_container_width=True)
+            
+            st.markdown("---")
+            
+            # Model Strengths Analysis
+            st.subheader("💡 Model Strengths")
+            strengths = get_model_strengths(
+                df,
+                results['content_rec_indices'],
+                results['embedding_rec_indices'],
+                results['hybrid_rec_indices'],
+                overlap_stats
+            )
+            
+            strength_col1, strength_col2, strength_col3 = st.columns(3)
+            
+            with strength_col1:
+                st.markdown("### 📋 Content-Based")
+                st.metric("Unique Picks", strengths['Content-Based']['unique_count'])
+                st.markdown("**Sample Unique Recommendations:**")
+                for movie in strengths['Content-Based']['unique_movies']:
+                    st.write(f"• {movie}")
+                st.caption("Excels at: Feature-based similarity")
+            
+            with strength_col2:
+                st.markdown("### 🧠 Semantic Embedding")
+                st.metric("Unique Picks", strengths['Semantic Embedding']['unique_count'])
+                st.markdown("**Sample Unique Recommendations:**")
+                for movie in strengths['Semantic Embedding']['unique_movies']:
+                    st.write(f"• {movie}")
+                st.caption("Excels at: Thematic connections")
+            
+            with strength_col3:
+                st.markdown("### ⭐ Popularity Hybrid")
+                st.metric("Unique Picks", strengths['Popularity Hybrid']['unique_count'])
+                st.markdown("**Sample Unique Recommendations:**")
+                for movie in strengths['Popularity Hybrid']['unique_movies']:
+                    st.write(f"• {movie}")
+                st.caption("Excels at: Balanced recommendations")
             
 else:
     # Placeholder when not enough movies selected
