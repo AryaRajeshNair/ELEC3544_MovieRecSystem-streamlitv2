@@ -149,7 +149,7 @@ if len(st.session_state.liked_movies) >= 3:
 
 **How it works**:
 1. Uses pre-trained `all-MiniLM-L6-v2` model (138M parameters) to encode movie overviews
-2. Each plot → 384-dimensional semantic embedding (captures meaning, themes, narrative patterns)
+2. Each plot → 384-dimensional semantic embedding (captures story themes, narrative patterns, emotional tone, plot devices)
 3. Creates user profile: `user_embedding = average(liked_movies_embeddings)`
 4. Computes cosine similarity in embedding space for all movies
 5. Returns top recommendations by semantic similarity
