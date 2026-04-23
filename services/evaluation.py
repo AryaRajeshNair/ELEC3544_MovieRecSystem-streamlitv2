@@ -1,6 +1,5 @@
 import pandas as pd
 import numpy as np
-import plotly.graph_objects as go
 
 
 def compute_model_overlap(content_indices, embedding_indices, hybrid_indices):
@@ -76,92 +75,3 @@ def build_model_comparison_table(df, content_indices, content_scores, embedding_
     return pd.DataFrame(comparison_data)
 
 
-def build_overlap_venn_data(overlap_stats):
-    """Prepare data for Venn diagram visualization."""
-    return {
-        'All Three': len(overlap_stats['all_three']),
-        'Content & Embedding': len(overlap_stats['content_embedding'] - overlap_stats['all_three']),
-        'Content & Hybrid': len(overlap_stats['content_hybrid'] - overlap_stats['all_three']),
-        'Embedding & Hybrid': len(overlap_stats['embedding_hybrid'] - overlap_stats['all_three']),
-        'Content Only': len(overlap_stats['content_unique']),
-        'Embedding Only': len(overlap_stats['embedding_unique']),
-        'Hybrid Only': len(overlap_stats['hybrid_unique'])
-    }
-
-
-def build_overlap_bar_chart(overlap_stats):
-    """Create a bar chart showing model agreement."""
-    categories = [
-        'All 3 Models',
-        'Content & Embedding',
-        'Content & Hybrid',
-        'Embedding & Hybrid',
-        'Content Only',
-        'Embedding Only',
-        'Hybrid Only'
-    ]
-    
-    values = [
-        len(overlap_stats['all_three']),
-        len(overlap_stats['content_embedding'] - overlap_stats['all_three']),
-        len(overlap_stats['content_hybrid'] - overlap_stats['all_three']),
-        len(overlap_stats['embedding_hybrid'] - overlap_stats['all_three']),
-        len(overlap_stats['content_unique']),
-        len(overlap_stats['embedding_unique']),
-        len(overlap_stats['hybrid_unique'])
-    ]
-    
-    colors = [
-        '#7C3AED',  # All three - purple
-        '#3B82F6',  # Content & Embedding - blue
-        '#06B6D4',  # Content & Hybrid - cyan
-        '#10B981',  # Embedding & Hybrid - green
-        '#F59E0B',  # Content only - amber
-        '#8B5CF6',  # Embedding only - violet
-        '#EC4899'   # Hybrid only - pink
-    ]
-    
-    fig = go.Figure(data=[
-        go.Bar(
-            x=categories,
-            y=values,
-            marker_color=colors,
-            text=values,
-            textposition='auto',
-            hovertemplate='<b>%{x}</b><br>Movies: %{y}<extra></extra>'
-        )
-    ])
-    
-    fig.update_layout(
-        title='Model Agreement Analysis',
-        xaxis_title='Recommendation Categories',
-        yaxis_title='Number of Movies',
-        template='plotly_white',
-        height=500,
-        showlegend=False
-    )
-    
-    return fig
-
-
-def get_model_strengths(df, content_indices, embedding_indices, hybrid_indices, overlap_stats):
-    """Analyze strengths of each model based on unique recommendations."""
-    strengths = {
-        'Content-Based': {
-            'unique_count': len(overlap_stats['content_unique']),
-            'agreement': len(overlap_stats['all_three']),
-            'unique_movies': [df.iloc[int(idx)]['title'] for idx in list(overlap_stats['content_unique'])[:3]]
-        },
-        'Semantic Embedding': {
-            'unique_count': len(overlap_stats['embedding_unique']),
-            'agreement': len(overlap_stats['all_three']),
-            'unique_movies': [df.iloc[int(idx)]['title'] for idx in list(overlap_stats['embedding_unique'])[:3]]
-        },
-        'Popularity Hybrid': {
-            'unique_count': len(overlap_stats['hybrid_unique']),
-            'agreement': len(overlap_stats['all_three']),
-            'unique_movies': [df.iloc[int(idx)]['title'] for idx in list(overlap_stats['hybrid_unique'])[:3]]
-        }
-    }
-    
-    return strengths

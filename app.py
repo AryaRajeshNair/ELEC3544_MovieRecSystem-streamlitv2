@@ -16,7 +16,6 @@ from services.visualization import get_pca_projection
 from services.evaluation import (
     compute_model_overlap,
     build_model_comparison_table,
-    get_model_strengths
 )
 
 # Set page config
@@ -349,17 +348,59 @@ if len(st.session_state.liked_movies) >= 3:
                 results['embedding_rec_indices'],
                 results['hybrid_rec_indices']
             )
+
+            total_recs = len(set(map(int, results['content_rec_indices'])))
+            all_three_count = len(overlap_stats['all_three'])
+            content_embedding_count = len(overlap_stats['content_embedding'])
+            content_hybrid_count = len(overlap_stats['content_hybrid'])
+            embedding_hybrid_count = len(overlap_stats['embedding_hybrid'])
             
-            # Model Agreement Metrics
+            st.caption(f"Each model returns {total_recs} recommendations. Overlap counts are out of {total_recs}.")
+
+            # Clear overlap metrics
             col1, col2, col3, col4 = st.columns(4)
             with col1:
-                st.metric("All 3 Agree", len(overlap_stats['all_three']))
+                st.metric("Common to all 3", all_three_count)
             with col2:
-                st.metric("Agreement %", f"{overlap_stats['agreement_percent']:.0f}%")
+                st.metric("Content + Embedding", content_embedding_count)
             with col3:
-                st.metric("Content Unique", len(overlap_stats['content_unique']))
+                st.metric("Content + Hybrid", content_hybrid_count)
             with col4:
-                st.metric("Embedding Unique", len(overlap_stats['embedding_unique']))
+                st.metric("Embedding + Hybrid", embedding_hybrid_count)
+
+            unique_col1, unique_col2, unique_col3 = st.columns(3)
+            with unique_col1:
+                st.metric("Only Content", len(overlap_stats['content_unique']))
+            with unique_col2:
+                st.metric("Only Embedding", len(overlap_stats['embedding_unique']))
+            with unique_col3:
+                st.metric("Only Hybrid", len(overlap_stats['hybrid_unique']))
+
+            st.markdown("---")
+
+            # Movie lists to make overlap interpretable
+            st.subheader("🎬 Overlap Movie Lists")
+
+            if all_three_count > 0:
+                all_three_titles = [df.iloc[int(idx)]['title'] for idx in sorted(overlap_stats['all_three'])]
+                st.write("**Recommended by all 3 models:**")
+                st.write(", ".join(all_three_titles))
+            else:
+                st.info("No movie was recommended by all three models for this input.")
+
+            with st.expander("Show pairwise overlaps"):
+                ce_titles = [df.iloc[int(idx)]['title'] for idx in sorted(overlap_stats['content_embedding'])]
+                ch_titles = [df.iloc[int(idx)]['title'] for idx in sorted(overlap_stats['content_hybrid'])]
+                eh_titles = [df.iloc[int(idx)]['title'] for idx in sorted(overlap_stats['embedding_hybrid'])]
+
+                st.write("**Content + Embedding:**")
+                st.write(", ".join(ce_titles) if ce_titles else "None")
+
+                st.write("**Content + Hybrid:**")
+                st.write(", ".join(ch_titles) if ch_titles else "None")
+
+                st.write("**Embedding + Hybrid:**")
+                st.write(", ".join(eh_titles) if eh_titles else "None")
             
             st.markdown("---")
             
@@ -375,44 +416,6 @@ if len(st.session_state.liked_movies) >= 3:
                 results['hybrid_scores']
             )
             st.dataframe(comparison_df, use_container_width=True)
-            
-            st.markdown("---")
-            
-            # Model Strengths Analysis
-            st.subheader("💡 Model Strengths")
-            strengths = get_model_strengths(
-                df,
-                results['content_rec_indices'],
-                results['embedding_rec_indices'],
-                results['hybrid_rec_indices'],
-                overlap_stats
-            )
-            
-            strength_col1, strength_col2, strength_col3 = st.columns(3)
-            
-            with strength_col1:
-                st.markdown("### 📋 Content-Based")
-                st.metric("Unique Picks", strengths['Content-Based']['unique_count'])
-                st.markdown("**Sample Unique Recommendations:**")
-                for movie in strengths['Content-Based']['unique_movies']:
-                    st.write(f"• {movie}")
-                st.caption("Excels at: Feature-based similarity")
-            
-            with strength_col2:
-                st.markdown("### 🧠 Semantic Embedding")
-                st.metric("Unique Picks", strengths['Semantic Embedding']['unique_count'])
-                st.markdown("**Sample Unique Recommendations:**")
-                for movie in strengths['Semantic Embedding']['unique_movies']:
-                    st.write(f"• {movie}")
-                st.caption("Excels at: Thematic connections")
-            
-            with strength_col3:
-                st.markdown("### ⭐ Popularity Hybrid")
-                st.metric("Unique Picks", strengths['Popularity Hybrid']['unique_count'])
-                st.markdown("**Sample Unique Recommendations:**")
-                for movie in strengths['Popularity Hybrid']['unique_movies']:
-                    st.write(f"• {movie}")
-                st.caption("Excels at: Balanced recommendations")
             
 else:
     # Placeholder when not enough movies selected
